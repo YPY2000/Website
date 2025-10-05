@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tagesziele Tracker</title>
+    <!-- HTML2Canvas für den Screenshot -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    // Herbstliche Farbpalette (Braun, Beige, Dunkelgrün)
+                    colors: {
+                        'primary-dark': '#14532d',    // Dunkles Waldgrün (Erfolg/Aktionen)
+                        'secondary-beige': '#f7e3d1', // Gedämpftes Beige (Akzent/Hintergrund)
+                        'tertiary-terracotta': '#993333', // Gedämpftes Terrakotta (Achtung)
+                        'accent-brown': '#7c2d12',    // Dunkelbraun (Text/Headers)
+                        'bg-light': '#fafafa',        // Fast Weiß/Creme Hintergrund
+                        'card-bg': '#ffffff',         // Reine weiße Karte
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        
+        /* Die Karte auf 4:5 Aspect Ratio beschränken */
+        .instagram-card {
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            background-color: #fefce8; /* Helle Creme */
+            border: 4px solid #14532d; /* Dunkelgrüner Rahmen */
+            
+            /* Enforce 4:5 aspect ratio for Instagram portrait/carousel */
+            width: 100%;
+            max-width: 400px; 
+            height: 500px; 
+            margin-left: auto;
+            margin-right: auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* Styling für radio buttons */
+        .yes-no-input:checked + .yes-no-label-yes {
+            background-color: #14532d; /* Dark Green */
+            color: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            transform: scale(1.05);
+        }
+        .yes-no-input:checked + .yes-no-label-no {
+            background-color: #993333; /* Terracotta */
+            color: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            transform: scale(1.05);
+        }
+        .rating-input:checked + .rating-label {
+            background-color: #7c2d12; /* Dark Brown */
+            color: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            transform: scale(1.05);
+        }
+        
+        .rating-label, .yes-no-label {
+            transition: all 0.15s ease-in-out;
+            border: 1px solid #d1d5db;
+        }
+
+        /* Log Einträge Symbole */
+        .log-success { color: #14532d; font-weight: bold; }
+        .log-failure { color: #993333; font-weight: bold; }
+        
+    </style>
+</head>
+<body class="bg-bg-light min-h-screen font-sans p-4 md:p-8">
+
+    <div id="auth-loading" class="text-center py-10">
+        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-dark mx-auto"></div>
+        <p class="mt-4 text-gray-600">Lade Anwendung und Nutzerdaten...</p>
+    </div>
+
+    <div id="main-content" class="hidden max-w-xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-extrabold text-accent-brown">🎯 Mein Ziel-Tracker</h1>
+            <p id="user-id-display" class="text-xs text-gray-500 mt-1"></p>
+        </header>
+        
+        <!-- Tages-Eingabe-Formular -->
+        <section class="mb-8 p-6 bg-white rounded-xl shadow-lg border border-gray-100">
+            <h2 class="text-xl font-bold mb-4 text-primary-dark">Tägliche Bewertung</h2>
+            
+            <label for="date-input" class="block text-sm font-medium text-gray-700 mb-1">Datum auswählen:</label>
+            <input type="date" id="date-input" class="w-full p-2 mb-4 border border-gray-300 rounded-lg focus:ring-primary-dark focus:border-primary-dark">
+            
+            <form id="daily-form" class="space-y-4">
+
+                <!-- Mindful Eating Goals -->
+                <div class="space-y-3 p-4 border-l-4 border-primary-dark bg-secondary-beige/50 rounded-lg">
+                    <h3 class="font-semibold text-lg text-primary-dark">Mindful Eating Ziele (Ja/Nein)</h3>
+                    
+                    <!-- Goal 1 to 5: Statisch definiert -->
+                    <div class="tracking-item" data-goal="goal1">
+                        <p class="font-medium text-gray-800 mb-2" id="goal-title-1">Lade Ziel 1...</p>
+                        <div class="flex space-x-2">
+                            <input type="radio" name="goal1" id="goal1-yes" value="true" class="hidden yes-no-input">
+                            <label for="goal1-yes" class="yes-no-label yes-no-label-yes flex-1 text-center py-2 rounded-lg cursor-pointer bg-gray-100 hover:bg-primary-dark/80 hover:text-white transition">Ja</label>
+                            <input type="radio" name="goal1" id="goal1-no" value="false" class="hidden yes-no-input">
+                            <label for="goal1-no" class="yes-no-label yes-no-label-no flex-1 text-center py-2 rounded-lg cursor-pointer bg-gray-100 hover:bg-tertiary-terracotta/80 hover:text-white transition">Nein</label>
+                        </div>
+                    </div>
+                    <div class="tracking-item" data-goal="goal2">
+                        <p class="font-medium text-gray-800 mb-2" id="goal-title-2">Lade Ziel 2...</p>
+                        <div class="flex space-x-2">
+                            <input type="radio" name="goal2" id="goal2-yes" value="true" class="hidden yes-no-input">
+                            <label for="goal2-yes" class="yes-no-label yes-no-label-yes flex-1 text-center py-2 rounded-lg cursor-pointer bg-gray-100 hover:bg-primary-dark/80 hover:text-white transition">Ja</label>
+                            <input type="radio" name="goal2" id="goal2-no" value="false" class="hidden yes-no-input">
+                            <label for="goal2-no" class="yes-no-label yes-no-label-no flex-1 text-center py-2 rounded-lg cursor-pointer bg-gray-100 hover:bg-tertiary-terracotta/80 hover:text-white transition">Nein</label>
+                        </div>
+                    </div>
+                    <div class="tracking-item" data-goal="goal3">
+                        <p class="font-medium text-gray-800 mb-2" id="goal-title-3">Lade Ziel 3...</p>
+                        <div class="flex space-x-2">
+                            <input type="radio" name="goal3" id="goal3-yes" value="true" class="hidden yes-no-input">
+                            <label for="goal3-yes" class="yes-no-label yes-no-label-yes flex-1 text-center py-2 rounded-lg cursor-pointer bg-gray-100 hover:bg-primary-dark/80 hover:text-white transition">Ja</label>
+                            <input type="radio" name="goal3" id="goal3-no" value="false" class="hidden yes-no-input">
+                            <label for="goal3-no" class="yes-no-label yes-no-label-no flex-1 text-center py-2 rounded-lg cursor-pointer bg-gray-100 hover:bg-tertiary-terracotta/80 hover:text-white transition">Nein</label>
+                        </div>
+                    </div>
+                    <div class="tracking-item" data-goal="goal4">
+                        <p class="font-medium text-gray-800 mb-2" id="goal-title-4">Lade Ziel 4...</p>
+                        <div class="flex space-x-2">
+                            <input type="radio" name="goal4" id="goal4-yes" value="true" class="hidden yes-no-input">
+                            <label for="goal4-yes" class="yes-no-label yes-no-label-yes flex-1 text-center py-2 rounded-lg cursor-pointer bg-gray-100 hover:bg-primary-dark/80 hover:text-white transition">Ja</label>
+                            <input type="radio" name="goal4" id="goal4-no" value="false" class="hidden yes-no-input">
+                            <label for="goal4-no" class="yes-no-label yes-no-label-no flex-1 text-center py-2 rounded-lg cursor-pointer bg-gray-100 hover:bg-tertiary-terracotta/80 hover:text-white transition">Nein</label>
+                        </div>
+                    </div>
+                    <div class="tracking-item" data-goal="goal5">
+                        <p class="font-medium text-gray-800 mb-2" id="goal-title-5">Lade Ziel 5...</p>
+                        <div class="flex space-x-2">
+                            <input type="radio" name="goal5" id="goal5-yes" value="true" class="hidden yes-no-input">
+                            <label for="goal5-yes" class="yes-no-label yes-no-label-yes flex-1 text-center py-2 rounded-lg cursor-pointer bg-gray-100 hover:bg-primary-dark/80 hover:text-white transition">Ja</label>
+                            <input type="radio" name="goal5" id="goal5-no" value="false" class="hidden yes-no-input">
+                            <label for="goal5-no" class="yes-no-label yes-no-label-no flex-1 text-center py-2 rounded-lg cursor-pointer bg-gray-100 hover:bg-tertiary-terracotta/80 hover:text-white transition">Nein</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Neue Felder: Erfolge und Herausforderungen -->
+                <div class="space-y-4 p-4 border-l-4 border-accent-brown bg-secondary-beige/70 rounded-lg">
+                    <h3 class="font-semibold text-lg text-accent-brown">Tägliches Storytelling</h3>
+
+                    <div class="tracking-item">
+                        <label for="successes" class="font-medium text-gray-800 mb-2 block">Die 3 größten Erfolge des Tages (kurze Sätze):</label>
+                        <textarea id="successes" name="successes" rows="3" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-accent-brown focus:border-accent-brown"></textarea>
+                    </div>
+
+                    <div class="tracking-item">
+                        <label for="challenges" class="font-medium text-gray-800 mb-2 block">Die größte Herausforderung des Tages:</label>
+                        <textarea id="challenges" name="challenges" rows="2" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-accent-brown focus:border-accent-brown"></textarea>
+                    </div>
+                </div>
+
+
+                <!-- General Metrics (Ratings) -->
+                <div class="space-y-4 p-4 border-l-4 border-primary-dark bg-secondary-beige/50 rounded-lg">
+                    <h3 class="font-semibold text-lg text-primary-dark">Wichtige Metriken</h3>
+
+                    <!-- Overall Day Rating (Statisch definiert) -->
+                    <div class="tracking-item" data-goal="overallRating">
+                        <p class="font-medium text-gray-800 mb-2">Gesamtbewertung des Tages (1 = Schlecht, 5 = Großartig)</p>
+                        <div class="flex justify-between space-x-1">
+                            <input type="radio" name="overallRating" id="overallRating-1" value="1" class="hidden rating-input">
+                            <label for="overallRating-1" class="rating-label flex-1 text-center py-2 rounded-lg cursor-pointer bg-gray-100 hover:bg-accent-brown/80 hover:text-white transition">1</label>
+                            <input type="radio" name="overallRating" id="overallRating-2" value="2" class="hidden rating-input">
+                            <label for="overallRating-2" class="rating-label flex-1 text-center py-2 rounded-lg cursor-pointer bg-gray-100 hover:bg-accent-brown/80 hover:text-white transition">2</label>
+                            <input type="radio" name="overallRating" id="overallRating-3" value="3" class="hidden rating-input">
+                            <label for="overallRating-3" class="rating-label flex-1 text-center py-2 rounded-lg cursor-pointer bg-gray-100 hover:bg-accent-brown/80 hover:text-white transition">3</label>
+                            <input type="radio" name="overallRating" id="overallRating-4" value="4" class="hidden rating-input">
+                            <label for="overallRating-4" class="rating-label flex-1 text-center py-2 rounded-lg cursor-pointer bg-gray-100 hover:bg-accent-brown/80 hover:text-white transition">4</label>
+                            <input type="radio" name="overallRating" id="overallRating-5" value="5" class="hidden rating-input">
+                            <label for="overallRating-5" class="rating-label flex-1 text-center py-2 rounded-lg cursor-pointer bg-gray-100 hover:bg-accent-brown/80 hover:text-white transition">5</label>
+                        </div>
+                    </div>
+
+                    <!-- Weight Loss Contribution (Statisch definiert) -->
+                    <div class="tracking-item" data-goal="weightLossConfidence">
+                        <p class="font-medium text-gray-800 mb-2">Trägt dieser Tag zur Gewichtsabnahme bei? (1 = Eher nicht, 5 = Sehr sicher)</p>
+                        <div class="flex justify-between space-x-1">
+                            <input type="radio" name="weightLossConfidence" id="weightLossConfidence-1" value="1" class="hidden rating-input">
+                            <label for="weightLossConfidence-1" class="rating-label flex-1 text-center py-2 rounded-lg cursor-pointer bg-gray-100 hover:bg-accent-brown/80 hover:text-white transition">1</label>
+                            <input type="radio" name="weightLossConfidence" id="weightLossConfidence-2" value="2" class="hidden rating-input">
+                            <label for="weightLossConfidence-2" class="rating-label flex-1 text-center py-2 rounded-lg cursor-pointer bg-gray-100 hover:bg-accent-brown/80 hover:text-white transition">2</label>
+                            <input type="radio" name="weightLossConfidence" id="weightLossConfidence-3" value="3" class="hidden rating-input">
+                            <label for="weightLossConfidence-3" class="rating-label flex-1 text-center py-2 rounded-lg cursor-pointer bg-gray-100 hover:bg-accent-brown/80 hover:text-white transition">3</label>
+                            <input type="radio" name="weightLossConfidence" id="weightLossConfidence-4" value="4" class="hidden rating-input">
+                            <label for="weightLossConfidence-4" class="rating-label flex-1 text-center py-2 rounded-lg cursor-pointer bg-gray-100 hover:bg-accent-brown/80 hover:text-white transition">4</label>
+                            <input type="radio" name="weightLossConfidence" id="weightLossConfidence-5" value="5" class="hidden rating-input">
+                            <label for="weightLossConfidence-5" class="rating-label flex-1 text-center py-2 rounded-lg cursor-pointer bg-gray-100 hover:bg-accent-brown/80 hover:text-white transition">5</label>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" id="save-button" class="w-full py-3 bg-primary-dark text-white font-bold rounded-xl shadow-md hover:bg-primary-dark/80 transition disabled:opacity-50" disabled>
+                    Tagesdaten Speichern
+                </button>
+                <p id="save-message" class="text-sm text-center mt-2 text-primary-dark hidden">Gespeichert!</p>
+            </form>
+        </section>
+
+        <h2 class="text-2xl font-bold mb-4 text-accent-brown text-center">📊 Wöchentliche Instagram-Vorschau</h2>
+        <p class="text-center text-sm text-gray-600 mb-4">Erstelle deinen wöchentlichen Karussell-Beitrag!</p>
+        
+        <!-- Weekly Summary Card (Instagram Aesthetic) - Fixed 4:5 ratio -->
+        <section id="weekly-summary" class="instagram-card p-6 rounded-3xl mb-4 flex flex-col justify-between">
+            <div>
+                <div class="text-center mb-4">
+                    <h3 class="text-2xl font-extrabold text-accent-brown mb-1">Wochen-Rückblick</h3>
+                    <p class="text-sm text-gray-600" id="date-range">...</p>
+                </div>
+
+                <div id="summary-content" class="space-y-3 flex-grow">
+                    <p class="text-center text-gray-500">Lade Daten...</p>
+                </div>
+            </div>
+            
+            <div class="mt-6 pt-4 border-t border-accent-brown/50 text-center">
+                <p class="text-xs text-primary-dark font-bold uppercase tracking-widest">#PROGRESS #MINDFULEATING #GOALS</p>
+            </div>
+        </section>
+
+        <div class="text-center mb-8">
+             <button id="download-button" class="py-3 px-8 bg-accent-brown text-white font-bold rounded-xl shadow-lg hover:bg-accent-brown/80 transition disabled:opacity-50">
+                Vorschau herunterladen (PNG)
+            </button>
+        </div>
+
+
+        <!-- Detailed Log (for debugging/review) -->
+        <section class="mb-8 p-6 bg-white rounded-xl shadow-lg border border-gray-100">
+            <h2 class="text-xl font-bold mb-4 text-gray-900">Detailliertes Log (Letzte 30 Tage)</h2>
+            <div id="log-list" class="space-y-2 text-sm">
+                <!-- Log entries will be inserted here -->
+                <p class="text-gray-500">Log wird geladen...</p>
+            </div>
+        </section>
+    </div>
+
+    <!-- Firebase Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, query, orderBy, limit, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Set up logging for debugging
+        setLogLevel('Debug');
+
+        // --- Globals & Config ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db, auth, userId = null;
+        let isAuthReady = false;
+
+        // Goal titles in German
+        const GOAL_TITLES = [
+            "1. Essen, wenn hungrig",
+            "2. Pause machen (allgemein)",
+            "3. Richtiges Essen zubereiten",
+            "4. Nicht snacken beim Zubereiten",
+            "5. Eine Portion und dann ist Schluss"
+        ];
+        
+        // Tailwind color mapping for the progress bar 
+        const getProgressColor = (percentage) => {
+            if (percentage >= 80) return '#14532d'; // primary-dark (Dunkelgrün)
+            if (percentage >= 50) return '#7c2d12'; // accent-brown (Dunkelbraun)
+            return '#993333'; // tertiary-terracotta (Terracotta)
+        };
+        const getProgressColorClass = (percentage) => {
+            if (percentage >= 80) return 'primary-dark';
+            if (percentage >= 50) return 'accent-brown';
+            return 'tertiary-terracotta';
+        };
+
+
+        // Fill goal titles in the form
+        document.addEventListener('DOMContentLoaded', () => {
+            GOAL_TITLES.forEach((title, index) => {
+                const element = document.getElementById(`goal-title-${index + 1}`);
+                if (element) {
+                    element.textContent = title;
+                }
+            });
+        });
+
+        // --- Firebase Initialization and Auth ---
+        try {
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+
+            setPersistence(auth, browserLocalPersistence)
+                .then(() => {
+                    return initialAuthToken 
+                        ? signInWithCustomToken(auth, initialAuthToken)
+                        : signInAnonymously(auth);
+                })
+                .catch((error) => {
+                    console.error("Firebase Sign-In Fehler:", error);
+                    signInAnonymously(auth);
+                });
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    userId = user.uid;
+                    document.getElementById('user-id-display').textContent = `Nutzer-ID: ${userId}`;
+                    isAuthReady = true;
+                    document.getElementById('auth-loading').classList.add('hidden');
+                    document.getElementById('main-content').classList.remove('hidden');
+                    
+                    setupRealtimeListeners();
+                } else {
+                    console.log("No user signed in.");
+                    document.getElementById('auth-loading').classList.add('hidden');
+                    document.getElementById('main-content').classList.remove('hidden');
+                }
+            });
+
+        } catch (e) {
+            console.error("Fehler bei der Firebase-Initialisierung:", e);
+            document.getElementById('auth-loading').innerHTML = `<p class="text-red-600">Fehler beim Laden der App-Konfiguration.</p>`;
+        }
+        
+        // --- Utility Functions ---
+
+        const getTodayDate = () => {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        const getDateXDaysAgo = (days) => {
+            const date = new Date();
+            date.setDate(date.getDate() - days);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        
+        // --- Form Handling ---
+
+        const dateInput = document.getElementById('date-input');
+        const dailyForm = document.getElementById('daily-form');
+        const saveButton = document.getElementById('save-button');
+        const saveMessage = document.getElementById('save-message');
+        
+        dateInput.value = getTodayDate();
+
+        dateInput.addEventListener('change', () => {
+            saveButton.disabled = !dateInput.value;
+            loadDailyData(dateInput.value);
+        });
+
+        const loadDailyData = async (date) => {
+            if (!isAuthReady || !date || !userId) return;
+            
+            dailyForm.reset();
+            saveButton.disabled = false;
+            saveMessage.classList.add('hidden');
+
+            const docRef = doc(db, "artifacts", appId, "users", userId, "daily_tracker", date);
+            try {
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    
+                    // Populate form fields
+                    Object.keys(data).forEach(key => {
+                        const value = String(data[key]);
+                        // For radio buttons (goals and ratings)
+                        const input = document.querySelector(`[name="${key}"][value="${value}"]`);
+                        if (input) {
+                            input.checked = true;
+                        }
+                        // For text areas (challenges and successes)
+                        const textarea = document.getElementById(key);
+                        if (textarea) {
+                            textarea.value = value;
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error("Fehler beim Laden der Tagesdaten:", error);
+            }
+        };
+
+        dailyForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!isAuthReady || !userId) {
+                alertMessage("Authentifizierung fehlgeschlagen. Bitte neu laden.", 'tertiary-terracotta');
+                return;
+            }
+
+            saveButton.disabled = true;
+            saveButton.textContent = "Speichere...";
+
+            const date = dateInput.value;
+            const formData = new FormData(dailyForm);
+            const data = { date, timestamp: Date.now() };
+
+            // Populate data object
+            for (let [key, value] of formData.entries()) {
+                if (['overallRating', 'weightLossConfidence'].includes(key)) {
+                    data[key] = parseInt(value, 10);
+                } else if (value === 'true' || value === 'false') {
+                    data[key] = value === 'true';
+                } else {
+                    data[key] = value; // Saves successes and challenges as string
+                }
+            }
+            
+            // Check for required fields: 5 goals, 2 ratings, successes, challenges
+            const requiredFields = ['goal1', 'goal2', 'goal3', 'goal4', 'goal5', 'overallRating', 'weightLossConfidence', 'successes', 'challenges'];
+            
+            const allFilled = requiredFields.every(field => {
+                if (['successes', 'challenges'].includes(field)) {
+                    return data[field] !== undefined && String(data[field]).trim() !== '';
+                }
+                return data[field] !== undefined && (typeof data[field] !== 'number' || !isNaN(data[field]));
+            });
+
+            if (!allFilled) {
+                 alertMessage("Bitte fülle alle Pflichtfelder aus!", 'tertiary-terracotta');
+                 saveButton.textContent = "Tagesdaten Speichern";
+                 saveButton.disabled = false;
+                 return;
+            }
+
+            const docRef = doc(db, "artifacts", appId, "users", userId, "daily_tracker", date);
+
+            try {
+                await setDoc(docRef, data, { merge: true });
+                console.log("Dokument erfolgreich geschrieben:", date);
+                
+                saveButton.textContent = "Gespeichert! ✓";
+                saveMessage.classList.remove('hidden');
+                setTimeout(() => {
+                    saveButton.textContent = "Tagesdaten Speichern";
+                    saveMessage.classList.add('hidden');
+                    saveButton.disabled = false;
+                }, 2000);
+
+            } catch (error) {
+                console.error("Fehler beim Schreiben des Dokuments:", error);
+                alertMessage("Speicherfehler beim Dokument.", 'tertiary-terracotta');
+                saveButton.textContent = "Speicherfehler ❌";
+                saveButton.disabled = false;
+            }
+        });
+        
+        // --- Realtime Listeners and Rendering ---
+
+        function setupRealtimeListeners() {
+            if (!db || !userId) return;
+
+            const trackerRef = collection(db, "artifacts", appId, "users", userId, "daily_tracker");
+            const qLog = query(trackerRef, orderBy("date", "desc"), limit(30)); 
+
+            onSnapshot(qLog, (snapshot) => {
+                const logData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderDetailedLog(logData);
+                renderWeeklySummary(logData);
+            }, (error) => {
+                console.error("Fehler beim Abrufen des Logs:", error);
+            });
+            
+            loadDailyData(getTodayDate());
+        }
+
+        const renderDetailedLog = (data) => {
+            const logList = document.getElementById('log-list');
+            if (data.length === 0) {
+                logList.innerHTML = '<p class="text-gray-500">Noch keine Einträge vorhanden.</p>';
+                return;
+            }
+
+            logList.innerHTML = data.map(entry => {
+                const checkGoals = (g) => g ? '<span class="log-success">✓</span>' : '<span class="log-failure">x</span>';
+                
+                // Show a snippet of the challenge/success
+                const snippetSuccess = entry.successes ? entry.successes.split('\n')[0].substring(0, 30) + (entry.successes.length > 30 ? '...' : '') : '';
+                const snippetChallenge = entry.challenges ? entry.challenges.substring(0, 30) + (entry.challenges.length > 30 ? '...' : '') : '';
+
+
+                return `
+                    <div class="flex flex-col p-3 bg-white rounded-lg shadow-sm border border-gray-100">
+                        <span class="font-bold text-accent-brown mb-1">${entry.date}</span>
+                        <div class="flex justify-between items-center text-xs">
+                            <div class="flex space-x-2 text-sm">
+                                <span title="${GOAL_TITLES[0]}">${checkGoals(entry.goal1)}</span>
+                                <span title="${GOAL_TITLES[1]}">${checkGoals(entry.goal2)}</span>
+                                <span title="${GOAL_TITLES[2]}">${checkGoals(entry.goal3)}</span>
+                                <span title="${GOAL_TITLES[3]}">${checkGoals(entry.goal4)}</span>
+                                <span title="${GOAL_TITLES[4]}">${checkGoals(entry.goal5)}</span>
+                            </div>
+                            <div class="flex space-x-2 text-xs">
+                                <span class="text-accent-brown font-semibold" title="Gesamtbewertung">Tag: ${entry.overallRating || '-'}</span>
+                                <span class="text-tertiary-terracotta font-semibold" title="Abnahme Zuversicht">Abn.: ${entry.weightLossConfidence || '-'}</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-primary-dark mt-1 truncate" title="Erfolge">${snippetSuccess ? 'E: ' + snippetSuccess : ''}</p>
+                        <p class="text-xs text-tertiary-terracotta mt-0 truncate" title="Herausforderung">${snippetChallenge ? 'H: ' + snippetChallenge : ''}</p>
+                    </div>
+                `;
+            }).join('');
+        };
+        
+        const renderWeeklySummary = (allData) => {
+            const summaryContent = document.getElementById('summary-content');
+            const dateRangeElement = document.getElementById('date-range');
+            
+            const today = getTodayDate();
+            const sevenDaysAgo = getDateXDaysAgo(6);
+            
+            const weeklyData = allData
+                .filter(entry => entry.date >= sevenDaysAgo && entry.date <= today)
+                .sort((a, b) => b.date.localeCompare(a.date));
+
+            if (weeklyData.length === 0) {
+                summaryContent.innerHTML = '<p class="text-center text-gray-500 p-4">Für die letzten 7 Tage liegen noch keine Daten vor.</p>';
+                dateRangeElement.textContent = `${sevenDaysAgo} bis ${today}`;
+                return;
+            }
+
+            dateRangeElement.textContent = `Daten von ${weeklyData[weeklyData.length - 1].date} bis ${weeklyData[0].date} (${weeklyData.length} Tage)`;
+
+            // --- Calculation ---
+            const totalDays = weeklyData.length;
+            let successCounts = { goal1: 0, goal2: 0, goal3: 0, goal4: 0, goal5: 0 };
+            let totalOverallRating = 0;
+            let totalWeightLossConfidence = 0;
+            
+            // Extract recent challenge/success for the card
+            const latestEntry = weeklyData[0] || {};
+            const keySuccess = (latestEntry.successes || '').split('\n').filter(s => s.trim() !== '')[0] || 'Kein Haupterfolg notiert.';
+            const keyChallenge = (latestEntry.challenges || '').trim() || 'Keine Herausforderung notiert.';
+
+
+            weeklyData.forEach(entry => {
+                for (let i = 1; i <= 5; i++) {
+                    if (entry[`goal${i}`] === true) {
+                        successCounts[`goal${i}`]++;
+                    }
+                }
+                totalOverallRating += entry.overallRating || 0;
+                totalWeightLossConfidence += entry.weightLossConfidence || 0;
+            });
+
+            // Calculate Averages and Percentages
+            const avgOverallRating = (totalOverallRating / totalDays).toFixed(1);
+            const avgWeightLossConfidence = (totalWeightLossConfidence / totalDays).toFixed(1);
+
+            
+            const overallGoalSuccess = Object.values(successCounts).reduce((a, b) => a + b, 0);
+            const overallSuccessPercentage = ((overallGoalSuccess / (totalDays * 5)) * 100).toFixed(0);
+
+            // --- Rendering the Instagram Card ---
+            let goalSuccessHtml = '';
+            for (let i = 0; i < 5; i++) {
+                const percentage = ((successCounts[`goal${i+1}`] / totalDays) * 100).toFixed(0);
+                
+                const colorHex = getProgressColor(percentage);
+                const colorClass = getProgressColorClass(percentage);
+
+                goalSuccessHtml += `
+                    <div class="flex justify-between items-center text-gray-800 text-xs">
+                        <span class="font-medium flex-1">${GOAL_TITLES[i].substring(3)}</span>
+                        <span class="font-bold text-${colorClass} text-sm">${percentage}%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-1.5 mb-1">
+                        <div class="h-1.5 rounded-full" style="width: ${percentage}%; background-color: ${colorHex}"></div>
+                    </div>
+                `;
+            }
+
+            summaryContent.innerHTML = `
+                <div class="bg-primary-dark/10 p-4 rounded-xl shadow-inner border border-primary-dark/30 text-center mb-4">
+                    <p class="text-4xl font-extrabold text-primary-dark">${overallSuccessPercentage}%</p>
+                    <p class="text-sm font-semibold text-gray-600 mt-1">Ziel-Erfüllung (Ø Woche)</p>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-3 text-center mb-4">
+                    <div class="bg-accent-brown/10 p-3 rounded-xl shadow-inner border border-accent-brown/30">
+                        <p class="text-3xl font-extrabold text-accent-brown">${avgOverallRating}</p>
+                        <p class="text-xs font-semibold text-gray-600 mt-1">Tag-Bewertung (Ø)</p>
+                    </div>
+                    <div class="bg-tertiary-terracotta/10 p-3 rounded-xl shadow-inner border border-tertiary-terracotta/30">
+                        <p class="text-3xl font-extrabold text-tertiary-terracotta">${avgWeightLossConfidence}</p>
+                        <p class="text-xs font-semibold text-gray-600 mt-1">Abnahme-Zuversicht (Ø)</p>
+                    </div>
+                </div>
+                
+                <h4 class="text-sm font-bold text-accent-brown mb-2 mt-4 border-b pb-1 border-gray-300">Wöchentliche Ziel-Performance</h4>
+                ${goalSuccessHtml}
+
+                <div class="mt-4 p-3 bg-secondary-beige rounded-xl border border-gray-300">
+                    <p class="font-bold text-sm text-primary-dark mb-1">Highlight (Letzter Tag):</p>
+                    <p class="text-xs text-primary-dark truncate">${keySuccess}</p>
+                    <p class="font-bold text-sm text-tertiary-terracotta mt-2 mb-1">Herausforderung (Letzter Tag):</p>
+                    <p class="text-xs text-tertiary-terracotta truncate">${keyChallenge}</p>
+                </div>
+            `;
+        };
+        
+        // Custom Alert/Message System (to replace browser alerts)
+        function alertMessage(message, colorClass = 'primary-dark') {
+            const container = document.getElementById('save-message');
+            // Use specific Tailwind classes for color based on input string
+            let color = 'text-primary-dark';
+            if (colorClass === 'tertiary-terracotta') color = 'text-tertiary-terracotta';
+            
+            container.textContent = message;
+            container.className = `text-sm text-center mt-2 font-semibold ${color}`;
+            container.classList.remove('hidden');
+            setTimeout(() => {
+                container.classList.add('hidden');
+            }, 3000);
+        }
+
+        // --- Screenshot Functionality ---
+        document.getElementById('download-button').addEventListener('click', () => {
+            const card = document.getElementById('weekly-summary');
+            
+            // Temporary measure to ensure full content is captured if any overflow exists
+            const originalHeight = card.style.height;
+            card.style.height = '500px'; 
+
+            html2canvas(card, {
+                useCORS: true,
+                backgroundColor: card.style.backgroundColor || '#fefce8',
+                scale: 2 
+            }).then(canvas => {
+                card.style.height = originalHeight; // Restore original height
+                const link = document.createElement('a');
+                link.download = `Wochenueberblick_${getTodayDate()}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            });
+        });
+
+    </script>
+</body>
+</html>
